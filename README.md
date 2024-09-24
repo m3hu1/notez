@@ -30,7 +30,7 @@ NOTEZ is an AI-powered math solver that allows users to draw mathematical expres
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/yourusername/notez.git
+    git clone https://github.com/m3hu1/notez.git
     cd notez/frontend
     ```
 
