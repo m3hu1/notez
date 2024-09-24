@@ -2,6 +2,8 @@
 
 NOTEZ is an AI-powered math solver that allows users to draw mathematical expressions on a canvas and get instant solutions. The project leverages React, TypeScript, Vite, and FastAPI to provide a seamless and interactive experience.
 
+You can check the **frontend repository** [here](https://github.com/m3hu1/notez-frontend) and the **backend repository** [here](https://github.com/m3hu1/notez-backend).
+
 ## Table of Contents
 
 - [Features](#features)
