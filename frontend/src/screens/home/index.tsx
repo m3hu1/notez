@@ -5,6 +5,7 @@ import CommandBox from "@/components/ui/commandbox";
 import { FaGithub } from "react-icons/fa";
 import CommandBoxRun from "@/components/ui/commandboxrun";
 import { Analytics } from "@vercel/analytics/react"
+import { Toaster } from "@/components/ui/toaster";
 
 interface GeneratedResult {
   expression: string;
@@ -313,6 +314,7 @@ export default function Home() {
         ))}
       <CommandBoxRun onRun={handleRun} />
       <Analytics />
+      <Toaster showOnLoad={true} />
       </>
   );
 }
