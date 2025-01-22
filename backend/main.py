@@ -14,7 +14,7 @@ app = FastAPI(lifespan=lifespan)
 # Update the CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://notezai.vercel.app"],  # Specify your frontend's origin
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

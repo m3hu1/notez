@@ -29,46 +29,90 @@
 import google.generativeai as genai
 import ast
 import json
+import re
 from PIL import Image
 from constants import GEMINI_API_KEY
 
 genai.configure(api_key=GEMINI_API_KEY)
+
+def clean_response(text: str) -> str:
+    # Remove code block identifiers and markers
+    text = re.sub(r'```\w*\n?', '', text)  # Removes ```python, ```json, etc.
+    text = re.sub(r'```', '', text)
+    # Remove any leading/trailing whitespace
+    text = text.strip()
+    return text
 
 def analyze_image(img: Image, dict_of_vars: dict):
     model = genai.GenerativeModel(model_name="gemini-1.5-flash")
     dict_of_vars_str = json.dumps(dict_of_vars, ensure_ascii=False)
     prompt = (
         f"You have been given an image with some mathematical expressions, equations, or graphical problems, and you need to solve them. "
-        f"Note: Use the PEMDAS rule for solving mathematical expressions. PEMDAS stands for the Priority Order: Parentheses, Exponents, Multiplication and Division (from left to right), Addition and Subtraction (from left to right). Parentheses have the highest priority, followed by Exponents, then Multiplication and Division, and lastly Addition and Subtraction. "
-        f"For example: "
-        f"Q. 2 + 3 * 4 "
-        f"(3 * 4) => 12, 2 + 12 = 14. "
-        f"Q. 2 + 3 + 5 * 4 - 8 / 2 "
-        f"5 * 4 => 20, 8 / 2 => 4, 2 + 3 => 5, 5 + 20 => 25, 25 - 4 => 21. "
+        f"IMPORTANT: You have access to previously defined variables in this dictionary: {dict_of_vars_str}. "
+        f"ALWAYS check this dictionary first and use these values to solve expressions. "
+        f"For example, if dict_of_vars is {{'x': 6}} and you see 'x^2', you should calculate 6^2 = 36. "
+        f"Note: Use the PEMDAS rule for solving mathematical expressions. PEMDAS stands for the Priority Order: Parentheses, Exponents, Multiplication and Division (from left to right), Addition and Subtraction (from left to right). "
+        f"Examples with variables: "
+        f"1. If dict_of_vars = {{'x': 6}} and expression is 'x^2', return: [{{'expr': 'x^2', 'result': 36}}] "
+        f"2. If dict_of_vars = {{'x': 2, 'y': 3}} and expression is 'x * y', return: [{{'expr': 'x * y', 'result': 6}}] "
         f"YOU CAN HAVE FIVE TYPES OF EQUATIONS/EXPRESSIONS IN THIS IMAGE, AND ONLY ONE CASE SHALL APPLY EVERY TIME: "
         f"Following are the cases: "
-        f"1. Simple mathematical expressions like 2 + 2, 3 * 4, 5 / 6, 7 - 8, etc.: In this case, solve and return the answer in the format of a LIST OF ONE DICT [{{'expr': given expression, 'result': calculated answer}}]. "
-        f"2. Set of Equations like x^2 + 2x + 1 = 0, 3y + 4x = 0, 5x^2 + 6y + 7 = 12, etc.: In this case, solve for the given variable, and the format should be a COMMA SEPARATED LIST OF DICTS, with dict 1 as {{'expr': 'x', 'result': 2, 'assign': True}} and dict 2 as {{'expr': 'y', 'result': 5, 'assign': True}}. This example assumes x was calculated as 2, and y as 5. Include as many dicts as there are variables. "
-        f"3. Assigning values to variables like x = 4, y = 5, z = 6, etc.: In this case, assign values to variables and return another key in the dict called {{'assign': True}}, keeping the variable as 'expr' and the value as 'result' in the original dictionary. RETURN AS A LIST OF DICTS. "
-        f"4. Analyzing Graphical Math problems, which are word problems represented in drawing form, such as cars colliding, trigonometric problems, problems on the Pythagorean theorem, adding runs from a cricket wagon wheel, etc. These will have a drawing representing some scenario and accompanying information with the image. PAY CLOSE ATTENTION TO DIFFERENT COLORS FOR THESE PROBLEMS. You need to return the answer in the format of a LIST OF ONE DICT [{{'expr': given expression, 'result': calculated answer}}]. "
-        f"5. Detecting Abstract Concepts that a drawing might show, such as love, hate, jealousy, patriotism, or a historic reference to war, invention, discovery, quote, etc. USE THE SAME FORMAT AS OTHERS TO RETURN THE ANSWER, where 'expr' will be the explanation of the drawing, and 'result' will be the abstract concept. "
-        f"Analyze the equation or expression in this image and return the answer according to the given rules: "
-        f"Make sure to use extra backslashes for escape characters like \\f -> \\\\f, \\n -> \\\\n, etc. "
-        f"Here is a dictionary of user-assigned variables. If the given expression has any of these variables, use its actual value from this dictionary accordingly: {dict_of_vars_str}. "
-        f"DO NOT USE BACKTICKS OR MARKDOWN FORMATTING. "
-        f"PROPERLY QUOTE THE KEYS AND VALUES IN THE DICTIONARY FOR EASIER PARSING WITH Python's ast.literal_eval."
+        f"1. Simple mathematical expressions (including those with known variables): Return format: [{{'expr': 'expression', 'result': numerical_answer}}] "
+        f"2. Set of Equations solving for variables: Return format: [{{'expr': 'variable', 'result': value, 'assign': true}}] "
+        f"3. Assigning values to variables: Return format: [{{'expr': 'variable', 'result': value, 'assign': true}}] "
+        f"4. Graphical Math problems: Return format: [{{'expr': 'problem description', 'result': 'numerical answer'}}] "
+        f"5. Abstract Concepts: Return format: [{{'expr': 'drawing explanation', 'result': 'concept name'}}] "
+        f"IMPORTANT RULES: "
+        f"1. ALWAYS check dict_of_vars ({dict_of_vars_str}) first and use those values "
+        f"2. For expressions with known variables, substitute and calculate the result "
+        f"3. Return numerical results for expressions with known variables "
+        f"4. NO markdown, NO code blocks, NO extra text "
+        f"5. Use double quotes for strings "
+        f"6. Numbers should not be quoted "
+        f"7. Boolean values should be true or false (not quoted) "
+        f"8. Return ONLY the array of dictionaries "
     )
+
     response = model.generate_content([prompt, img])
-    print(response.text)
-    answers = []
+    print("Raw response:", response.text)
+
     try:
-        answers = ast.literal_eval(response.text)
+        # Clean the response first
+        cleaned_text = clean_response(response.text)
+        print("Cleaned response:", cleaned_text)
+
+        # Try parsing methods in order
+        try:
+            # Method 1: Direct JSON parsing after converting single quotes to double
+            cleaned_json = cleaned_text.replace("'", '"').replace("True", "true").replace("False", "false")
+            answers = json.loads(cleaned_json)
+        except json.JSONDecodeError:
+            try:
+                # Method 2: ast.literal_eval
+                answers = ast.literal_eval(cleaned_text)
+            except:
+                # Method 3: More aggressive cleaning
+                final_attempt = re.sub(r'[^\[\]{}"\',:0-9a-zA-Z\s+\-*/()=]', '', cleaned_text)
+                answers = ast.literal_eval(final_attempt)
+
+        # Ensure answers is a list
+        if not isinstance(answers, list):
+            answers = [answers]
+
+        # Format and validate each answer
+        formatted_answers = []
+        for answer in answers:
+            if isinstance(answer, dict):
+                formatted_answer = {
+                    'expr': str(answer.get('expr', '')),
+                    'result': answer.get('result', ''),
+                    'assign': bool(answer.get('assign', False))
+                }
+                formatted_answers.append(formatted_answer)
+
+        print('Formatted answers:', formatted_answers)
+        return formatted_answers
+
     except Exception as e:
-        print(f"Error in parsing response from Gemini API: {e}")
-    print('returned answer ', answers)
-    for answer in answers:
-        if 'assign' in answer:
-            answer['assign'] = True
-        else:
-            answer['assign'] = False
-    return answers
+        print(f"Error processing response: {e}")
+        return []

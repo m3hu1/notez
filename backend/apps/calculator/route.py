@@ -14,7 +14,8 @@ async def run(data: ImageData):
     image = Image.open(image_bytes)
     responses = analyze_image(image, dict_of_vars=data.dict_of_vars)
     data = []
-    for response in responses:
-        data.append(response)
-    print('response in route: ', response)
+    # Remove the response variable since it's not needed
+    for response_item in responses:
+        data.append(response_item)
+    print('responses in route: ', responses)  # Changed from response to responses
     return {"message": "Image processed", "data": data, "status": "success"}
