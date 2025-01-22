@@ -4,7 +4,7 @@ import Draggable from "react-draggable";
 import CommandBox from "@/components/ui/commandbox";
 import { FaGithub } from "react-icons/fa";
 import CommandBoxRun from "@/components/ui/commandboxrun";
-import { Analytics } from "@vercel/analytics/react"
+import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/toaster";
 
 interface GeneratedResult {
@@ -19,6 +19,10 @@ interface Response {
 }
 
 export default function Home() {
+  // adding this after interview feedback
+  const [isCanvasEmpty, setIsCanvasEmpty] = useState(true);
+  // adding loader to show that the thing is running
+  const [isLoading, setIsLoading] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color] = useState("rgb(255, 255, 255)");
@@ -29,7 +33,9 @@ export default function Home() {
   const [latexExpression, setLatexExpression] = useState<Array<string>>([]);
 
   const getCoordinates = (
-    event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+    event:
+      | React.MouseEvent<HTMLCanvasElement>
+      | React.TouchEvent<HTMLCanvasElement>,
   ) => {
     if ("touches" in event && event.touches.length > 0) {
       const touch = event.touches[0];
@@ -107,19 +113,29 @@ export default function Home() {
     }
   }, [dictOfVars]);
 
-  const handleRun = useCallback(() => {
-    runRoute();
+  const handleRun = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      await runRoute();
+    } finally {
+      setIsLoading(false);
+    }
   }, [runRoute]);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = async (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
         handleReset();
       }
       if ((event.metaKey || event.ctrlKey) && event.key === "j") {
         event.preventDefault();
-        handleRun();
+        setIsLoading(true);
+        try {
+          await handleRun();
+        } finally {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -150,7 +166,7 @@ export default function Home() {
         }
       }
     },
-    []
+    [],
   );
 
   useEffect(() => {
@@ -224,14 +240,18 @@ export default function Home() {
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        setIsCanvasEmpty(true);
       }
     }
   };
 
   const startDrawing = (
-    event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+    event:
+      | React.MouseEvent<HTMLCanvasElement>
+      | React.TouchEvent<HTMLCanvasElement>,
   ) => {
     event.preventDefault();
+    setIsCanvasEmpty(false);
     const coordinates = getCoordinates(event);
     const canvas = canvasRef.current;
     if (canvas) {
@@ -246,7 +266,9 @@ export default function Home() {
   };
 
   const draw = (
-    event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+    event:
+      | React.MouseEvent<HTMLCanvasElement>
+      | React.TouchEvent<HTMLCanvasElement>,
   ) => {
     event.preventDefault();
     if (!isDrawing) return;
@@ -263,7 +285,9 @@ export default function Home() {
   };
 
   const stopDrawing = (
-    event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+    event:
+      | React.MouseEvent<HTMLCanvasElement>
+      | React.TouchEvent<HTMLCanvasElement>,
   ) => {
     event.preventDefault();
     setIsDrawing(false);
@@ -312,9 +336,18 @@ export default function Home() {
             </div>
           </Draggable>
         ))}
-      <CommandBoxRun onRun={handleRun} />
+      <CommandBoxRun
+        onRun={handleRun}
+        isLoading={isLoading}
+        setIsLoading={setIsLoading}
+      />
+      {isCanvasEmpty && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-gray-400 text-2xl font-light select-none">
+          Start drawing...
+        </div>
+      )}
       <Analytics />
       <Toaster showOnLoad={true} />
-      </>
+    </>
   );
 }
